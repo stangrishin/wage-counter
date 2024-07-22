@@ -1,12 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
 import { currencies, months, periods } from './types';
+import AddItemForm from './components/AddItemForm';
+import ItemList from './components/ItemList';
 
 const currentMonthValue = new Date()
   .toLocaleString('default', { month: 'long' })
   .toLowerCase();
 const initialMonth =
   months.find((m) => m.value === currentMonthValue) || months[0];
+
+interface Item {
+  id: string;
+  name: string;
+  price: number;
+  accumulated: number;
+}
 
 function App() {
   const [userInputNumber, setHourlyRate] = useState<number | string>('');
@@ -18,6 +27,7 @@ function App() {
   const [customHours, setCustomHours] = useState<number | string>(
     initialMonth.hours
   );
+  const [items, setItems] = useState<Item[]>([]);
 
   const startTimeRef = useRef<Date | null>(null);
 
@@ -77,6 +87,38 @@ function App() {
     setIsRunning(false);
     startTimeRef.current = null;
   };
+
+  const handleAddItem = (name: string, price: number) => {
+    const newItem: Item = {
+      id: `item-${items.length + 1}`,
+      name,
+      price,
+      accumulated: 0,
+    };
+
+    setItems([...items, newItem]);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    setItems(items.filter((item) => item.id !== itemId));
+  };
+
+  const handleEditItem = (id: string, name: string, price: number) => {
+    setItems(
+      items.map((item) => (item.id === id ? { ...item, name, price } : item))
+    );
+  };
+
+  const moveItem = useCallback(
+    (dragIndex: number, hoverIndex: number) => {
+      const draggedItem = items[dragIndex];
+      const newItems = [...items];
+      newItems.splice(dragIndex, 1);
+      newItems.splice(hoverIndex, 0, draggedItem);
+      setItems(newItems);
+    },
+    [items]
+  );
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-blue-400 to-purple-600 text-white p-4'>
@@ -150,6 +192,14 @@ function App() {
       <div className='mt-8 text-2xl'>
         <span>{amount.toFixed(2)}</span> <span>{currency}</span>
       </div>
+      <AddItemForm onAddItem={handleAddItem} />
+      <ItemList
+        items={items}
+        progress={amount}
+        moveItem={moveItem}
+        handleRemoveItem={handleRemoveItem}
+        handleEditItem={handleEditItem}
+      />
     </div>
   );
 }
