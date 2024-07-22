@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './index.css';
 import { currencies, months, periods } from './types';
 
@@ -13,14 +13,13 @@ function App() {
   const [period, setPeriod] = useState(periods[0].value);
   const [amount, setAmount] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [timer, setTimer] = useState<ReturnType<typeof setInterval> | null>(
-    null
-  );
   const [currency, setCurrency] = useState(currencies[0].symbol);
   const [month, setMonth] = useState<string>(initialMonth.value);
   const [customHours, setCustomHours] = useState<number | string>(
     initialMonth.hours
   );
+
+  const startTimeRef = useRef<Date | null>(null);
 
   useEffect(() => {
     const selectedMonth = months.find((m) => m.value === month);
@@ -30,35 +29,42 @@ function App() {
   }, [month]);
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
     if (isRunning) {
-      const interval = setInterval(() => {
-        //ввели число
-        const amountInputByUser =
-          typeof userInputNumber === 'number' ? userInputNumber : 0;
-
-        //определяем количество секунд в выбранный пользователем промежуток времени
-        let numberOfSecondsInPeriod = 0;
-
-        if (period === 'hour') numberOfSecondsInPeriod = 60 * 60; // 3 600
-        if (period === 'day') numberOfSecondsInPeriod = 60 * 60 * 8; // 28 800
-        if (period === 'week') numberOfSecondsInPeriod = 60 * 60 * 8 * 5; // 144 000
-        if (period === 'month')
-          numberOfSecondsInPeriod =
-            typeof customHours === 'number' ? customHours * 3600 : 0; // 576 000
-
-        const ratePerSecond = amountInputByUser / numberOfSecondsInPeriod;
-
-        setAmount((prevAmount) => prevAmount + ratePerSecond);
-      }, 1000);
-      setTimer(interval);
-    } else if (timer) {
-      clearInterval(timer);
-      setTimer(null); // Ensure timer is null after clearing
-    }
-    return () => {
-      if (timer) {
-        clearInterval(timer);
+      if (!startTimeRef.current) {
+        startTimeRef.current = new Date();
       }
+
+      timer = setInterval(() => {
+        if (startTimeRef.current) {
+          const now = new Date();
+          const elapsedTime =
+            (now.getTime() - startTimeRef.current.getTime()) / 1000;
+
+          const amountInputByUser =
+            typeof userInputNumber === 'number' ? userInputNumber : 0;
+
+          let numberOfSecondsInPeriod = 0;
+          if (period === 'hour') numberOfSecondsInPeriod = 60 * 60;
+          if (period === 'day') numberOfSecondsInPeriod = 60 * 60 * 8;
+          if (period === 'week') numberOfSecondsInPeriod = 60 * 60 * 8 * 5;
+          if (period === 'month')
+            numberOfSecondsInPeriod =
+              typeof customHours === 'number' ? customHours * 3600 : 0;
+
+          const ratePerSecond = amountInputByUser / numberOfSecondsInPeriod;
+
+          setAmount(elapsedTime * ratePerSecond);
+        }
+      }, 1000);
+    } else {
+      startTimeRef.current = null;
+      if (timer) clearInterval(timer);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
     };
   }, [isRunning, userInputNumber, period, customHours]);
 
@@ -69,11 +75,12 @@ function App() {
   const handleReset = () => {
     setAmount(0);
     setIsRunning(false);
+    startTimeRef.current = null;
   };
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-blue-400 to-purple-600 text-white p-4'>
-      <h1 className='text-4xl font-bold mb-8'>Exotic Wage Counter</h1>
+      <h1 className='text-4xl font-bold mb-8'>Wage Counter Motivation</h1>
       <div className='bg-white text-black p-8 rounded-lg shadow-lg w-full max-w-md'>
         <input
           type='number'
