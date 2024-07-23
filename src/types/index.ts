@@ -27,3 +27,8 @@ export const months = [
   { label: 'November', value: 'november', hours: 167 },
   { label: 'December', value: 'december', hours: 168 },
 ];
+
+export interface FirebaseError {
+  code: string;
+  message: string;
+}
