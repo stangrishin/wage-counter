@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { currencies, months, periods } from './types';
+import UserInput from './components/UserInput';
+import MonthSelector from './components/MonthSelector';
+import ControlButtons from './components/ControlButtons';
 import AddItemForm from './components/AddItemForm';
 import ItemList from './components/ItemList';
 import { saveUserData, getUserData } from './utils/firestore';
 import { useAuth } from './hooks/useAuth';
+import { currencies, months, periods } from './types';
 
 const currentMonthValue = new Date()
   .toLocaleString('default', { month: 'long' })
@@ -23,6 +26,7 @@ const WageCounter: React.FC = () => {
   const [userInputNumber, setUserInputNumber] = useState<number | string>('');
   const [period, setPeriod] = useState(periods[0].value);
   const [amount, setAmount] = useState<number>(0);
+  const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [currency, setCurrency] = useState(currencies[0].symbol);
   const [month, setMonth] = useState<string>(initialMonth.value);
@@ -42,6 +46,7 @@ const WageCounter: React.FC = () => {
           setUserInputNumber(data.userInputNumber);
           setItems(data.items);
           setAmount(data.amount);
+          setTotalAmount(data.totalAmount);
           setCurrency(data.currency);
           setPeriod(data.period);
           setDataFetched(true); // Set dataFetched to true after fetching data
@@ -68,10 +73,6 @@ const WageCounter: React.FC = () => {
 
       timer = setInterval(() => {
         if (startTimeRef.current) {
-          const now = new Date();
-          const elapsedTime =
-            (now.getTime() - startTimeRef.current.getTime()) / 1000;
-
           const amountInputByUser =
             typeof userInputNumber === 'number' ? userInputNumber : 0;
 
@@ -85,7 +86,8 @@ const WageCounter: React.FC = () => {
 
           const ratePerSecond = amountInputByUser / numberOfSecondsInPeriod;
 
-          setAmount(elapsedTime * ratePerSecond);
+          setAmount((prevAmount) => prevAmount + ratePerSecond);
+          setTotalAmount((prevTotal) => prevTotal + ratePerSecond);
         }
       }, 1000);
     } else {
@@ -106,6 +108,7 @@ const WageCounter: React.FC = () => {
         amount,
         currency,
         period,
+        totalAmount,
       }).catch((error) => console.error('Error saving user data:', error));
     }
   }, [
@@ -116,6 +119,7 @@ const WageCounter: React.FC = () => {
     amount,
     currency,
     period,
+    totalAmount,
   ]);
 
   const handleStartPause = () => {
@@ -124,6 +128,19 @@ const WageCounter: React.FC = () => {
 
   const handleReset = () => {
     setAmount(0);
+    setTotalAmount((prevAmount) => prevAmount - amount);
+    setIsRunning(false);
+    startTimeRef.current = null;
+  };
+
+  const handleStopForToday = () => {
+    setAmount(0);
+    setIsRunning(false);
+    startTimeRef.current = null;
+  };
+
+  const handleResetTotal = () => {
+    setTotalAmount(0);
     setIsRunning(false);
     startTimeRef.current = null;
   };
@@ -169,79 +186,40 @@ const WageCounter: React.FC = () => {
       >
         Logout
       </button>
-      <div className='bg-white text-black p-8 rounded-lg shadow-lg w-full max-w-md'>
-        <input
-          type='number'
-          placeholder='Enter rate per period'
-          value={userInputNumber}
-          onChange={(e) => setUserInputNumber(parseFloat(e.target.value))}
-          className='mb-4 p-2 border rounded w-full'
+      <div className='bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-black'>
+        <UserInput
+          userInputNumber={userInputNumber}
+          setUserInputNumber={setUserInputNumber}
+          currency={currency}
+          setCurrency={setCurrency}
+          period={period}
+          setPeriod={setPeriod}
         />
-        <select
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-          className='mb-4 p-2 border rounded w-full'
-        >
-          {currencies.map((curr) => (
-            <option key={curr.symbol} value={curr.symbol}>
-              {curr.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          className='mb-4 p-2 border rounded w-full'
-        >
-          {periods.map((period) => (
-            <option key={period.value} value={period.value}>
-              {period.label}
-            </option>
-          ))}
-        </select>
-
-        <div className='mb-4 flex items-center'>
-          <select
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className='p-2 border rounded mr-2 w-1/2'
-          >
-            {months.map((month) => (
-              <option key={month.value} value={month.value}>
-                {month.label}
-              </option>
-            ))}
-          </select>
-          <input
-            type='number'
-            placeholder='Working hours'
-            value={customHours}
-            onChange={(e) => setCustomHours(parseFloat(e.target.value))}
-            className='p-2 border rounded w-1/2'
-          />
-        </div>
-        <div className='flex items-center justify-between'>
-          <button
-            onClick={handleStartPause}
-            className='bg-blue-500 text-white p-2 rounded w-1/2 mr-2'
-          >
-            {isRunning ? 'Pause' : 'Start'}
-          </button>
-          <button
-            onClick={handleReset}
-            className='bg-red-500 text-white p-2 rounded w-1/2'
-          >
-            Reset
-          </button>
-        </div>
+        <MonthSelector
+          month={month}
+          setMonth={setMonth}
+          customHours={customHours}
+          setCustomHours={setCustomHours}
+        />
       </div>
+      <ControlButtons
+        isRunning={isRunning}
+        handleStartPause={handleStartPause}
+        handleReset={handleReset}
+        handleStopForToday={handleStopForToday}
+        handleResetTotal={handleResetTotal}
+      />
       <div className='mt-8 text-2xl'>
         <span>{amount.toFixed(2)}</span> <span>{currency}</span>
+      </div>
+      <div className='mt-2 text-2xl'>
+        <span>Total Amount: {totalAmount.toFixed(2)}</span>{' '}
+        <span>{currency}</span>
       </div>
       <AddItemForm onAddItem={handleAddItem} />
       <ItemList
         items={items}
-        progress={amount}
+        progress={totalAmount}
         moveItem={moveItem}
         handleRemoveItem={handleRemoveItem}
         handleEditItem={handleEditItem}

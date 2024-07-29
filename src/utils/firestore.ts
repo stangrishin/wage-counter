@@ -8,6 +8,7 @@ interface UserData {
   currency: string;
   period: string;
   userInputNumber: number;
+  totalAmount: number;
 }
 
 export const saveUserData = async (user: User, data: UserData) => {
